@@ -7,8 +7,9 @@
 ///
 
 // const baseUrl = "http://10.168.96.23:9999";
-const baseUrl = "http://110.41.179.89/app";
+const baseUrl = "http://192.168.10.20:9999";
 // 首页
+
 const homeDataUrl = "$baseUrl/api/home/index";
 // 品牌列表
 const brandListDataUrl = "$baseUrl/api/brand/list";

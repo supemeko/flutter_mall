@@ -38,7 +38,7 @@ class HttpUtil {
             print("\n");
             print("\n");
             print("========================请求数据===================");
-            print("url=${options.uri.toString()}");
+            print("${options.method} ${options.uri.toString()}");
             print("params=${options.data}");
           }
 

@@ -34,7 +34,7 @@ class _LoginState extends State<Login> {
   //提交登录
   void _submitLoginData() async {
     Map<String, dynamic> loginMap = <String, dynamic>{};
-    loginMap["username"] = _usernameController.value.text;
+    loginMap["account"] = _usernameController.value.text;
     loginMap["password"] = _passwordController.value.text;
     Response result = await HttpUtil.post(loginDataUrl, data: loginMap);
 
