@@ -35,6 +35,12 @@ const orderListDataUrl = "$baseUrl/api/order/orderList/";
 const orderDetailDataUrl = "$baseUrl/api/order/orderDetail/";
 // 收货地址列表
 const addressListDataUrl = "$baseUrl/api/member/address/list";
+// 收货地址添加
+const addressAdd = "$baseUrl/api/member/address/add";
+// 收货地址更新
+const addressUpdate = "$baseUrl/api/member/address/update";
+// 收货地址删除
+const addressDelete = "$baseUrl/api/member/address/delete";
 // 我的足迹
 const historyListDataUrl = "$baseUrl/api/history/list";
 // 我的收藏

@@ -41,7 +41,8 @@ class _AddressListState extends State<AddressList> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: const Text("收货地址", style: TextStyle(fontSize: 16, color: Colors.black)),
+        title: const Text("收货地址",
+            style: TextStyle(fontSize: 16, color: Colors.black)),
         centerTitle: true,
       ),
       body: Container(
@@ -53,18 +54,19 @@ class _AddressListState extends State<AddressList> {
                     itemCount: addressListData.length,
                     itemBuilder: (BuildContext context, int index) {
                       AddressListData data = addressListData[index];
-                      var boxDecoration = BoxDecoration(
+                      final boxDecoration = BoxDecoration(
                           border: Border.all(
                             width: 1,
-                            color: Color(int.parse('fa436a', radix: 16)).withAlpha(255),
+                            color: const Color(0xfffa436a),
                           ),
-                          borderRadius: const BorderRadius.all(Radius.circular(2)));
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(2)));
                       return Container(
                         padding: const EdgeInsets.all(15),
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                             border: Border(
-                                top:
-                                    BorderSide(width: 1, color: Color(int.parse('f5f5f5', radix: 16)).withAlpha(255)))),
+                                top: BorderSide(
+                                    width: 1, color: Color(0xfff5f5f5)))),
                         child: Row(
                           children: [
                             Expanded(
@@ -76,38 +78,43 @@ class _AddressListState extends State<AddressList> {
                                       Visibility(
                                         visible: data.defaultStatus == 1,
                                         child: Container(
-                                          margin: const EdgeInsets.only(right: 3),
+                                          margin:
+                                              const EdgeInsets.only(right: 3),
                                           decoration: boxDecoration,
-                                          child: Text("默认",
+                                          child: const Text("默认",
                                               style: TextStyle(
                                                   fontSize: 12,
-                                                  color: Color(int.parse('fa436a', radix: 16)).withAlpha(255))),
+                                                  color: Color(0xfffa436a))),
                                         ),
                                       ),
-                                      Text("${data.province} ${data.city} ${data.region} ${data.detailAddress}",
-                                          style: TextStyle(
+                                      Text(
+                                          "${data.province} ${data.city} ${data.region} ${data.detailAddress}",
+                                          style: const TextStyle(
                                               fontSize: 15,
-                                              color: Color(int.parse('303133', radix: 16)).withAlpha(255))),
+                                              color: Color(0xff303133))),
                                     ],
                                   ),
                                   const SizedBox(
                                     height: 10,
                                   ),
                                   Text("${data.name} ${data.phoneNumber}",
-                                      style: TextStyle(
-                                          fontSize: 14, color: Color(int.parse('909399', radix: 16)).withAlpha(255))),
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Color(0xff909399))),
                                 ],
                               ),
                             ),
                             Row(
                               children: [
                                 InkWell(
-                                  onTap: () {
+                                  onTap: () async {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (context) => const AddressAdd(),
+                                        builder: (context) =>
+                                            AddressAdd(data: data),
                                       ),
                                     );
+                                    queryAddressList();
                                   },
                                   child: Image.asset(
                                     "images/edit.png",
@@ -115,14 +122,6 @@ class _AddressListState extends State<AddressList> {
                                     width: 22,
                                   ),
                                 ),
-                                const SizedBox(
-                                  width: 15,
-                                ),
-                                Image.asset(
-                                  "images/delete.png",
-                                  height: 20,
-                                  width: 22,
-                                )
                               ],
                             )
                           ],
@@ -130,12 +129,13 @@ class _AddressListState extends State<AddressList> {
                       );
                     })),
             InkWell(
-              onTap: () {
-                Navigator.of(context).push(
+              onTap: () async {
+                final res = await Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (context) => const AddressAdd(),
                   ),
                 );
+                queryAddressList();
               },
               child: Container(
                 alignment: Alignment.center,
