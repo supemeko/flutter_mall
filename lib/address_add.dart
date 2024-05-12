@@ -2,8 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mall/config/service_url.dart';
 import 'package:flutter_mall/model/address_list.dart';
+import 'package:flutter_mall/widgets/postal_picker/table/table_postal.dart';
+import 'package:fluttercontactpicker/fluttercontactpicker.dart';
+import 'package:location/location.dart';
 
 import 'utils/http_util.dart';
+import 'widgets/address_add_lookup_text_field.dart';
+import 'widgets/postal_picker/postal_picker.dart';
+import 'widgets/postal_picker/table/table_node.dart';
+import 'widgets/postal_picker/table/tables.dart';
+import 'widgets/postal_picker/model/page.dart' as postal_page;
+import 'package:flutter_z_location/flutter_z_location.dart';
+
 ///
 /// 添加收货地址页面
 ///
@@ -35,23 +45,29 @@ class _AddressAddState extends State<AddressAdd> {
   /// 记录的收货人手机号
   final _phoneNumber = TextEditingController();
 
-  /// 记录的收货地址邮编
-  final _postCode = TextEditingController();
+  /// 记录的收货地址的邮递区域（所在区域）
+  final _postalRegion = TextEditingController();
 
-  /// 记录的收货地址省份
-  final _province = TextEditingController();
+  /// 邮递区域
+  List<String> postalList = ["", "", "", ""];
 
-  /// 记录的收货地址城市
-  final _city = TextEditingController();
-
-  /// 记录的收货地址区级行政规划
-  final _region = TextEditingController();
+  /// 邮递区号
+  late String _postalCode;
 
   /// 记录的收货地址详细信息
   final _detailAddress = TextEditingController();
 
+  /// 用户提供的地址信息
+  final _userProvideAddressInfo = TextEditingController();
+
+  /// 用户提供的地址信息【用户正在输入】
+  final FocusNode _userProvideAddressInfoFocus = FocusNode();
+
   /// 表单的key
   final _formKey = GlobalKey<FormState>();
+
+  /// 收货地址数据
+  final postalTables = defaultTables();
 
   @override
   void initState() {
@@ -62,11 +78,25 @@ class _AddressAddState extends State<AddressAdd> {
     _name.text = data?.name ?? '';
     _phoneNumber.text = data?.phoneNumber ?? '';
     _defaultStatus = data?.defaultStatus ?? 0;
-    _postCode.text = data?.postCode ?? '';
-    _province.text = data?.province ?? '';
-    _city.text = data?.city ?? '';
-    _region.text = data?.region ?? '';
+    _postalCode = data?.postCode ?? '';
+    postalList[0] = data?.province ?? '';
+    postalList[1] = data?.city ?? '';
+    postalList[2] = data?.region ?? '';
+    postalList[3] = '';
+    _postalRegion.text = _postalRegionDesc;
     _detailAddress.text = data?.detailAddress ?? '';
+  }
+
+  String get _postalRegionDesc {
+    var ss = "";
+    for (final s in postalList) {
+      ss += s.isNotEmpty ? "$s " : "";
+    }
+    ss = ss.trim();
+    if (ss.isEmpty) {
+      return "省/市/县";
+    }
+    return ss;
   }
 
   @override
@@ -172,7 +202,7 @@ class _AddressAddState extends State<AddressAdd> {
                       child: Text("手机号码", style: textStyle),
                     ),
                     Expanded(
-                      flex: 4,
+                      flex: 3,
                       child: TextFormField(
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
@@ -188,34 +218,23 @@ class _AddressAddState extends State<AddressAdd> {
                           },
                           style: textStyle),
                     ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(5),
-                decoration: boxDecoration,
-                child: Row(
-                  children: [
                     Expanded(
-                      flex: 1,
-                      child: Text("邮政编码", style: textStyle),
-                    ),
-                    Expanded(
-                      flex: 4,
-                      child: TextFormField(
-                          inputFormatters: [
-                            LengthLimitingTextInputFormatter(6)
-                          ],
-                          validator: (value) =>
-                              value?.length != 6 ? '邮政编码必须6位' : null,
-                          controller: _postCode,
-                          onChanged: (text) {
-                            setState(() {
-                              _postCode.text = text;
-                            });
-                          },
-                          style: textStyle),
-                    ),
+                        child: IconButton(
+                      icon: const Icon(Icons.contact_phone),
+                      color: Colors.blue,
+                      onPressed: () async {
+                        try {
+                          final PhoneContact contact =
+                              await FlutterContactPicker.pickPhoneContact();
+                          setState(() {
+                            _phoneNumber.text = contact.phoneNumber!.number!;
+                            _name.text = contact.fullName!;
+                          });
+                        } catch (e) {
+                          print("通信录选择失败");
+                        }
+                      },
+                    ))
                   ],
                 ),
               ),
@@ -229,8 +248,37 @@ class _AddressAddState extends State<AddressAdd> {
                       child: Text("所在区域", style: textStyle),
                     ),
                     Expanded(
-                      flex: 1,
+                      flex: 3,
                       child: TextFormField(
+                          enableInteractiveSelection: false,
+                          onTap: () async {
+                            FocusScope.of(context).requestFocus(FocusNode());
+                            final page = postal_page.Page(
+                              tables: postalTables,
+                              numberOfTabs: 4,
+                              callback: (page) => {
+                                setState(() {
+                                  for (int i = 0; i < 4; i++) {
+                                    // for 1..=4
+                                    final pageIndex = i + 1;
+                                    final postal =
+                                        page.selectiveList[pageIndex];
+                                    postalList[i] =
+                                        postal.isNotEmpty ? postal.name : '';
+                                    if (postal.isNotEmpty) {
+                                      _postalCode = postal.postalCode;
+                                    }
+                                  }
+                                  _postalRegion.text = _postalRegionDesc;
+                                })
+                              },
+                            );
+                            final postal = postalTables
+                                    .getPostalByPostalCode(_postalCode) ??
+                                rootPostal;
+                            page.pick(postal);
+                            PostalPicker.show(context: context, page: page);
+                          },
                           validator: (value) =>
                               (value == null || value.isEmpty) ? "不能为空" : null,
                           decoration: const InputDecoration(
@@ -239,54 +287,71 @@ class _AddressAddState extends State<AddressAdd> {
                             isDense: true,
                             contentPadding: EdgeInsets.all(10.0),
                           ),
-                          controller: _province,
+                          controller: _postalRegion,
                           onChanged: (text) {
                             setState(() {
-                              _province.text = text;
+                              _postalRegion.text = text;
                             });
                           },
                           style: textStyle),
                     ),
-                    const SizedBox(width: 20),
                     Expanded(
-                      flex: 1,
-                      child: TextFormField(
-                          validator: (value) =>
-                              (value == null || value.isEmpty) ? "不能为空" : null,
-                          decoration: const InputDecoration(
-                            border: UnderlineInputBorder(),
-                            hintText: "城市",
-                            isDense: true,
-                            contentPadding: EdgeInsets.all(10.0),
-                          ),
-                          controller: _city,
-                          onChanged: (text) {
-                            setState(() {
-                              _city.text = text;
-                            });
+                        flex: 1,
+                        child: IconButton(
+                          icon: const Icon(Icons.location_on),
+                          color: Colors.blue,
+                          onPressed: () async {
+                            try {
+                              // 获取GPS定位经纬度
+                              Location location = new Location();
+                              bool _serviceEnabled;
+                              PermissionStatus _permissionGranted;
+                              LocationData _locationData;
+
+                              _serviceEnabled = await location.serviceEnabled();
+                              if (!_serviceEnabled) {
+                                _serviceEnabled =
+                                    await location.requestService();
+                                if (!_serviceEnabled) {
+                                  print("服务没启动");
+                                  return;
+                                }
+                              }
+
+                              _permissionGranted =
+                                  await location.hasPermission();
+                              if (_permissionGranted ==
+                                  PermissionStatus.denied) {
+                                _permissionGranted =
+                                    await location.requestPermission();
+                                if (_permissionGranted !=
+                                    PermissionStatus.granted) {
+                                  print("请求权限没成功");
+                                  return;
+                                }
+                              }
+                              _locationData = await location.getLocation();
+
+                              print(
+                                  "loc:${_locationData.latitude},${_locationData.longitude}");
+                              // 经纬度反向地理编码获取地址信息(省、市、区)
+                              final loc =
+                                  await FlutterZLocation.geocodeCoordinate(
+                                      _locationData.latitude!,
+                                      _locationData.longitude!,
+                                      pathHead: 'assets/');
+                              setState(() {
+                                _postalCode = loc.districtId;
+                                postalList[0] = loc.province;
+                                postalList[1] = loc.city;
+                                postalList[2] = loc.district;
+                                _postalRegion.text = _postalRegionDesc;
+                              });
+                            } catch (e) {
+                              print("获取地理信息失败了:$e");
+                            }
                           },
-                          style: textStyle),
-                    ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      flex: 1,
-                      child: TextFormField(
-                          validator: (value) =>
-                              (value == null || value.isEmpty) ? "不能为空" : null,
-                          decoration: const InputDecoration(
-                            border: UnderlineInputBorder(),
-                            hintText: "区级",
-                            isDense: true,
-                            contentPadding: EdgeInsets.all(10.0),
-                          ),
-                          controller: _region,
-                          onChanged: (text) {
-                            setState(() {
-                              _region.text = text;
-                            });
-                          },
-                          style: textStyle),
-                    ),
+                        ))
                   ],
                 ),
               ),
@@ -315,6 +380,87 @@ class _AddressAddState extends State<AddressAdd> {
                   ],
                 ),
               ),
+              if (_create)
+                Container(
+                  color: Colors.white,
+                  // margin: const EdgeInsets.only(top: 8, bottom: 20),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 7, horizontal: 15),
+                  // height: 54,
+                  child: LookupTextField(
+                    onLookupText: (text) {
+                      // 首先移除姓名手机号和姓名
+                      var phone = null;
+                      var name = null;
+                      var detailAddress = null;
+                      List<Postal> address = [];
+                      // 1. lookup phone & name
+                      var first = text.split(RegExp(r"[ ,;，；.。]"));
+                      for (var s in first) {
+                        s = s.trim();
+                        if (RegExp(r"^1\d{10}$").hasMatch(s)) {
+                          phone = s;
+                        }
+                        if (s.length > 2 && s.length < 4 && s.startsWith("张") ||
+                            s.startsWith("曹") ||
+                            s.startsWith("刘")) {
+                          name = s;
+                        }
+                      }
+                      // 2. lookup postal
+                      List<Postal>? p = postalTables.lookupTree(text);
+                      if (p != null) {
+                        _postalCode = p.last.postalCode;
+                        for (var i = 0; i < p.length; i++) {
+                          postalList[i] = p[i].name;
+                        }
+                        _postalRegion.text = _postalRegionDesc;
+                      }
+                      // 3. remove all already
+                      var third = text;
+                      third = third.replaceAll(phone ?? ' ', ' ');
+                      third = third.replaceAll(name ?? ' ', ' ');
+                      if (p != null) {
+                        for (var i = 0; i < p.length; i++) {
+                          third = third.replaceAll(p[i].name, ' ');
+                        }
+                      }
+                      // 4.
+                      var fourth = third.split(RegExp(r"[ ,;，；.。]"));
+                      for (var s in fourth) {
+                        s = s.trim();
+                        if (RegExp(r"^1\d{10}$").hasMatch(s)) {
+                          phone ??= s;
+                        }
+                        if (s.length >= 2 &&
+                                s.length <= 4 &&
+                                s.startsWith("张") ||
+                            s.startsWith("曹") ||
+                            s.startsWith("刘")) {
+                          name ??= s;
+                        }
+                        if (s.length >= 4) {
+                          detailAddress ??= s;
+                          if (detailAddress.length < s.length) {
+                            detailAddress = s;
+                          }
+                        }
+                      }
+                      if (phone != null) {
+                        _phoneNumber.text = phone;
+                      }
+                      if (name != null) {
+                        _name.text = name;
+                      }
+                      if (detailAddress != null) {
+                        _detailAddress.text = detailAddress;
+                      }
+                      print('[][][]phone:$phone');
+                      print('[][][]name:$name');
+                      print('[][][]detail:$detailAddress');
+                    },
+                  ),
+                ),
               Container(
                 color: Colors.white,
                 margin: const EdgeInsets.only(top: 8, bottom: 20),
@@ -349,10 +495,10 @@ class _AddressAddState extends State<AddressAdd> {
                       'name': _name.text,
                       'phoneNumber': _phoneNumber.text,
                       'defaultStatus': _defaultStatus,
-                      'postCode': _postCode.text,
-                      'province': _province.text,
-                      'city': _city.text,
-                      'region': _region.text,
+                      'postCode': _postalCode,
+                      'province': postalList[0],
+                      'city': postalList[1],
+                      'region': postalList[2],
                       'detailAddress': _detailAddress.text,
                       if (_id != null) 'id': _id,
                     };

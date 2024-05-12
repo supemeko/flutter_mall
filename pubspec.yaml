@@ -44,6 +44,11 @@ dependencies:
   shared_preferences: ^2.2.2
   cached_network_image: ^3.3.0
   alipay_kit: 6.0.0
+  collection: ^1.18.0
+  fluttercontactpicker: 5.0.0
+  flutter_z_location: ^0.0.9
+  permission_handler: ^11.3.1
+  location: ^6.0.2
 
 dev_dependencies:
   flutter_test:
@@ -114,6 +119,11 @@ flutter:
     - images/checkbox_round_2.png
     - images/start.jpg
     - images/shopping_cart.png
+    - assets/province/
+    - assets/ip/
+    - assets/city/
+    - assets/district/
+    - assets/areaList/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware

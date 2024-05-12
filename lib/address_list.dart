@@ -108,7 +108,7 @@ class _AddressListState extends State<AddressList> {
                               children: [
                                 InkWell(
                                   onTap: () async {
-                                    Navigator.of(context).push(
+                                    await Navigator.of(context).push(
                                       MaterialPageRoute(
                                         builder: (context) =>
                                             AddressAdd(data: data),
@@ -130,7 +130,7 @@ class _AddressListState extends State<AddressList> {
                     })),
             InkWell(
               onTap: () async {
-                final res = await Navigator.of(context).push(
+                await Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (context) => const AddressAdd(),
                   ),
