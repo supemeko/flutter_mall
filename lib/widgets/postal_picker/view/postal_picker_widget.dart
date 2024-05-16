@@ -206,6 +206,13 @@ class _PostalPickerWidgetState extends State<PostalPickerWidget>
   }
 
   @override
+  void dispose() {
+    super.dispose();
+    _pageController.dispose();
+    _tabController.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
         height: widget.height,
