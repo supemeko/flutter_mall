@@ -38,8 +38,10 @@ class HttpUtil {
             print("\n");
             print("\n");
             print("========================请求数据===================");
-            print("${options.method} ${options.uri.toString()}");
-            print("params=${options.data}");
+            print(
+                "${options.method} ${options.uri.toString()} ${options.data ?? "(not request data)"}");
+            print("\n");
+            print("\n");
           }
 
           // 在请求之前做一些操作，比如添加token等
@@ -47,11 +49,9 @@ class HttpUtil {
         },
         onResponse: (Response response, ResponseInterceptorHandler handler) {
           if (kDebugMode) {
-            print("\n");
-            print("\n");
             print("========================响应数据===================");
-            print("code=${response.statusCode}");
-            print("response=${response.data}");
+            print(
+                "${response.statusCode} ${response.statusMessage} ${response.data}");
             print("==================================================");
             print("\n");
             print("\n");
@@ -80,7 +80,7 @@ class HttpUtil {
   }
 
   // 封装GET请求
-  static Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) async {
+  static Future<Response> get(String path, {Map<String, dynamic>? data}) async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       Map<String, dynamic> header = <String, dynamic>{};
@@ -88,7 +88,7 @@ class HttpUtil {
 
       Response response = await dio.get(
         path,
-        queryParameters: queryParameters,
+        data: data,
         options: Options(headers: header),
       );
       return response;
@@ -98,7 +98,8 @@ class HttpUtil {
   }
 
   // 封装POST请求，数据以JSON格式发送
-  static Future<Response> post(String path, {Map<String, dynamic>? data}) async {
+  static Future<Response> post(String path,
+      {Map<String, dynamic>? data}) async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       Map<String, dynamic> header = <String, dynamic>{};
@@ -116,7 +117,8 @@ class HttpUtil {
   }
 
   // 封装POST请求，数据以form表单格式发送
-  static Future<Response> postForm(String path, {Map<String, dynamic>? data}) async {
+  static Future<Response> postForm(String path,
+      {Map<String, dynamic>? data}) async {
     try {
       Response response = await dio.post(
         path,

@@ -33,6 +33,8 @@ const couponDataUrl = "$baseUrl/api/member/coupon/list/";
 const orderListDataUrl = "$baseUrl/api/order/orderList/";
 // 订单详情
 const orderDetailDataUrl = "$baseUrl/api/order/orderDetail/";
+// 订单取消
+const orderCancelUrl = "$baseUrl/api/order/cancelUserOrder";
 // 收货地址列表
 const addressListDataUrl = "$baseUrl/api/member/address/list";
 // 收货地址添加
