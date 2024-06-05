@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mall/config/service_url.dart';
@@ -226,39 +229,265 @@ class OrderListInfo extends StatelessWidget {
           if (listData.isNotEmpty)
             Expanded(
                 child: ListView.builder(
-                    itemCount: listData.length,
-                    itemBuilder: (context, index) {
-                      return InkWell(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => OrderDetail(
-                                orderId: listData[index].id,
-                              ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.only(left: 15),
-                          decoration: const BoxDecoration(
-                              border: Border(
-                                  bottom: BorderSide(
-                                      width: 5, color: Color(0xfff5f5f5)))),
-                          child: Column(children: [
-                            buildCreateTime(boxDecoration, index),
-                            buildProductList(index),
-                            buildAmount(boxDecoration, index),
-                            buildOrderOperate(index)
-                          ]),
-                        ),
-                      );
-                    })),
+              itemCount: listData.length,
+              // itemBuilder: (context, index) {
+              //   return InkWell(
+              //     onTap: () {
+              //       Navigator.of(context).push(
+              //         MaterialPageRoute(
+              //           builder: (context) => OrderDetail(
+              //             orderId: listData[index].id,
+              //           ),
+              //         ),
+              //       );
+              //     },
+              //     child: Container(
+              //       padding: const EdgeInsets.only(left: 15),
+              //       decoration: const BoxDecoration(
+              //           border: Border(
+              //               bottom: BorderSide(
+              //                   width: 5, color: Color(0xfff5f5f5)))),
+              //       child: Column(children: [
+              //         buildCreateTime(boxDecoration, index),
+              //         buildProductList(index),
+              //         buildAmount(boxDecoration, index),
+              //         buildOrderOperate(index)
+              //       ]),
+              //     ),
+              //   );
+              // }
+              itemBuilder: buildOrderPageCard,
+            )),
           if (listData.isEmpty) const Text("没有商品哦"),
           if (listData.isEmpty) const SizedBox(height: 50),
           if (listData.isEmpty) buildPersonalizedProductRecommendations()
         ],
       ),
     );
+  }
+
+  Card buildOrderPageCard(BuildContext context, int index) {
+    // 订单的商品列表
+    final itemList = listData[index].orderItemList;
+
+    // 订单的商品数量是否超过1个，超过时，不显示商品信息
+    bool more = itemList.length > 1;
+
+    // 订单的第一件商品
+    final firstItem = itemList[0];
+
+    // 商品描述，如果只有1件商品的话，就需要显示商品信息
+    final firstItemDesc = () {
+      if (more) {
+        return "";
+      }
+
+      // 最多显示多少个UTF16编码单元（可以显示的文字数量是有限的，没必要显示太多）
+      const firstItemDescCodeUnitsLimit = 60;
+      var desc = firstItem.productName;
+      var attr = jsonDecode(firstItem.productAttr);
+      for (var x in attr) {
+        desc += x['key'] + x['value'];
+        if (desc.length > firstItemDescCodeUnitsLimit) {
+          break;
+        }
+      }
+      return desc;
+    }();
+
+    // 最多允许显示多少件商品图片（可以显示的图片数量是有限的，没必要显示太多）
+    const maximumNumberOfPictures = 100;
+    final pictureIterator = itemList
+        .sublist(0, min(itemList.length, maximumNumberOfPictures))
+        .map((elem) => elem.productPic);
+
+    return Card(
+        margin: const EdgeInsets.all(10),
+        child: Container(
+          padding: const EdgeInsets.only(left: 15, right: 15),
+          child: Column(
+            children: [
+              SizedBox(
+                height: 40,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(listData[index].createTime.toString(),
+                          style: const TextStyle(
+                              fontSize: 14, color: Color(0xff303133))),
+                    ),
+                    Text(getOrderStatus(listData[index].status),
+                        style: const TextStyle(
+                            fontSize: 14, color: Color(0xfffa436a)))
+                  ],
+                ),
+              ),
+              if (more)
+                SizedBox(
+                  height: 100,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                          child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: pictureIterator
+                              .map((elem) => Row(
+                                    children: [
+                                      CachedImageWidget(
+                                        96,
+                                        96,
+                                        elem,
+                                        fit: BoxFit.contain,
+                                      ),
+                                      const SizedBox(width: 8)
+                                    ],
+                                  ))
+                              .toList(),
+                        ),
+                      )),
+                      SizedBox(
+                        width: 100,
+                        child: ListTile(
+                          title: const Text("￥1000.00",
+                              style: TextStyle(
+                                  fontSize: 12, color: Color(0xff707070))),
+                          subtitle: Text("共${itemList.length}件",
+                              style: const TextStyle(
+                                  fontSize: 10, color: Color(0xff707070))),
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+              if (!more)
+                SizedBox(
+                  height: 100,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      CachedImageWidget(
+                        96,
+                        96,
+                        firstItem.productPic,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(
+                        width: 1,
+                      ),
+                      Expanded(
+                          child: ListTile(
+                        title: Text(
+                          firstItemDesc,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      )),
+                      SizedBox(
+                        width: 100,
+                        child: ListTile(
+                          title: const Text("￥1000.00",
+                              style: TextStyle(
+                                  fontSize: 12, color: Color(0xff707070))),
+                          subtitle: Text("共${itemList.length}件",
+                              style: const TextStyle(
+                                  fontSize: 10, color: Color(0xff707070))),
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+              ListTile(
+                title: Row(
+                  children: [
+                    const Text("更多",
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xffaaacb0))),
+                    const Expanded(child: Text("")),
+                    TextButton(
+                      onPressed: () {},
+                      style: TextButton.styleFrom(
+                          shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(20)),
+                        side: BorderSide(color: Color(0xffaaacb0), width: 1),
+                      )),
+                      child: const Text("买了换钱",
+                          style: TextStyle(
+                              fontSize: 14, color: Color(0xff303133))),
+                    ),
+                    const SizedBox(width: 5),
+                    TextButton(
+                      onPressed: () {},
+                      style: TextButton.styleFrom(
+                          shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(20)),
+                        side: BorderSide(color: Color(0xffaaacb0), width: 1),
+                      )),
+                      child: const Text("退换/售后",
+                          style: TextStyle(
+                              fontSize: 14, color: Color(0xff303133))),
+                    ),
+                    const SizedBox(width: 5),
+                    TextButton(
+                      onPressed: () {},
+                      style: TextButton.styleFrom(
+                          shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(20)),
+                        side: BorderSide(color: Colors.red, width: 1),
+                      )),
+                      child: const Text("再次购买",
+                          style: TextStyle(fontSize: 14, color: Colors.red)),
+                    )
+                  ],
+                ),
+              )
+            ],
+          ),
+        )
+        // Column(
+        //   children: [
+        //     Container(
+        //       padding: const EdgeInsets.only(left: 15, right: 15),
+        //       height: 40,
+        //       child: Row(
+        //         crossAxisAlignment: CrossAxisAlignment.center,
+        //         children: [
+        //           Expanded(
+        //             child: Text(listData[index].createTime.toString(),
+        //                 style: const TextStyle(
+        //                     fontSize: 14, color: Color(0xff303133))),
+        //           ),
+        //           Text(getOrderStatus(listData[index].status),
+        //               style:
+        //                   const TextStyle(fontSize: 14, color: Color(0xfffa436a)))
+        //         ],
+        //       ),
+        //     ),
+        //     Container(
+        //       padding: const EdgeInsets.only(left: 15, right: 15),
+        //       height: 64,
+        //       child: Row(
+        //         crossAxisAlignment: CrossAxisAlignment.center,
+        //         children: [
+        //           Expanded(
+        //             child: Text(listData[index].createTime.toString(),
+        //                 style: const TextStyle(
+        //                     fontSize: 14, color: Color(0xff303133))),
+        //           ),
+        //           Text(getOrderStatus(listData[index].status),
+        //               style:
+        //                   const TextStyle(fontSize: 14, color: Color(0xfffa436a)))
+        //         ],
+        //       ),
+        //     ),
+        //     ListTile(
+        //       title: Text("操作选项"),
+        //     )
+        //   ],
+        // ),
+        );
   }
 
   // 构建订单操作
