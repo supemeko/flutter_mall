@@ -49,6 +49,7 @@ dependencies:
   flutter_z_location: ^0.0.9
   permission_handler: ^11.3.1
   location: ^6.0.2
+  bitmask: ^1.0.1
 
 dev_dependencies:
   flutter_test:

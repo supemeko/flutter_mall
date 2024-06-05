@@ -4,10 +4,9 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mall/config/service_url.dart';
-import 'package:flutter_mall/order_detail.dart';
 import 'package:flutter_mall/utils/http_util.dart';
 import 'package:flutter_mall/widgets/cached_image_widget.dart';
-
+import 'dart:developer' as developer;
 import 'model/order_list_model.dart';
 
 ///
@@ -24,7 +23,7 @@ class OrderList extends StatefulWidget {
 }
 
 class _OrderListState extends State<OrderList> with TickerProviderStateMixin {
-  List<List<OrderListData>> orderListData = [[], [], [], [], []];
+  List<List<OrderData>> orderListData = [[], [], [], [], []];
 
   late PageController _pageViewController;
   late TabController _tabController;
@@ -50,7 +49,7 @@ class _OrderListState extends State<OrderList> with TickerProviderStateMixin {
       "status": tab.queryStatusList(),
     });
     setState(() {
-      OrderListModel orderListModel = OrderListModel.fromJson(result.data);
+      OrderPageResp orderListModel = OrderPageResp.fromJson(result.data);
       orderListData[tab.index] = orderListModel.data;
     });
   }
@@ -58,7 +57,7 @@ class _OrderListState extends State<OrderList> with TickerProviderStateMixin {
   Future<bool> cancelOrder(int orderId) async {
     // print("try cancel order $orderId!");
     Response result = await HttpUtil.get("$orderCancelUrl/$orderId");
-    print(result);
+    developer.log('$result');
     return true;
   }
 
@@ -204,7 +203,7 @@ class OrderListInfo extends StatelessWidget {
   final MemberOrderPageTabs enumerate;
   final Function(int page) onQueryList;
   final Function(int orderId) onOrderCancel;
-  final List<OrderListData> listData;
+  final List<OrderData> listData;
   final int page = 1;
 
   const OrderListInfo({
@@ -228,36 +227,11 @@ class OrderListInfo extends StatelessWidget {
         children: [
           if (listData.isNotEmpty)
             Expanded(
-                child: ListView.builder(
-              itemCount: listData.length,
-              // itemBuilder: (context, index) {
-              //   return InkWell(
-              //     onTap: () {
-              //       Navigator.of(context).push(
-              //         MaterialPageRoute(
-              //           builder: (context) => OrderDetail(
-              //             orderId: listData[index].id,
-              //           ),
-              //         ),
-              //       );
-              //     },
-              //     child: Container(
-              //       padding: const EdgeInsets.only(left: 15),
-              //       decoration: const BoxDecoration(
-              //           border: Border(
-              //               bottom: BorderSide(
-              //                   width: 5, color: Color(0xfff5f5f5)))),
-              //       child: Column(children: [
-              //         buildCreateTime(boxDecoration, index),
-              //         buildProductList(index),
-              //         buildAmount(boxDecoration, index),
-              //         buildOrderOperate(index)
-              //       ]),
-              //     ),
-              //   );
-              // }
-              itemBuilder: buildOrderPageCard,
-            )),
+              child: ListView.builder(
+                itemCount: listData.length,
+                itemBuilder: buildOrderPageCard,
+              ),
+            ),
           if (listData.isEmpty) const Text("没有商品哦"),
           if (listData.isEmpty) const SizedBox(height: 50),
           if (listData.isEmpty) buildPersonalizedProductRecommendations()
@@ -268,7 +242,11 @@ class OrderListInfo extends StatelessWidget {
 
   Card buildOrderPageCard(BuildContext context, int index) {
     // 订单的商品列表
-    final itemList = listData[index].orderItemList;
+    final orderData = listData[index];
+    final itemList = orderData.orderItemList;
+
+    assert(itemList.isNotEmpty,
+        'The order should have included at least one item, but order(${orderData.id}) did not');
 
     // 订单的商品数量是否超过1个，超过时，不显示商品信息
     bool more = itemList.length > 1;
@@ -313,11 +291,11 @@ class OrderListInfo extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
-                      child: Text(listData[index].createTime.toString(),
+                      child: Text(orderData.createTime.toString(),
                           style: const TextStyle(
                               fontSize: 14, color: Color(0xff303133))),
                     ),
-                    Text(getOrderStatus(listData[index].status),
+                    Text(getOrderStatus(orderData.status),
                         style: const TextStyle(
                             fontSize: 14, color: Color(0xfffa436a)))
                   ],
@@ -455,11 +433,11 @@ class OrderListInfo extends StatelessWidget {
         //         crossAxisAlignment: CrossAxisAlignment.center,
         //         children: [
         //           Expanded(
-        //             child: Text(listData[index].createTime.toString(),
+        //             child: Text(order.createTime.toString(),
         //                 style: const TextStyle(
         //                     fontSize: 14, color: Color(0xff303133))),
         //           ),
-        //           Text(getOrderStatus(listData[index].status),
+        //           Text(getOrderStatus(order.status),
         //               style:
         //                   const TextStyle(fontSize: 14, color: Color(0xfffa436a)))
         //         ],
@@ -472,11 +450,11 @@ class OrderListInfo extends StatelessWidget {
         //         crossAxisAlignment: CrossAxisAlignment.center,
         //         children: [
         //           Expanded(
-        //             child: Text(listData[index].createTime.toString(),
+        //             child: Text(order.createTime.toString(),
         //                 style: const TextStyle(
         //                     fontSize: 14, color: Color(0xff303133))),
         //           ),
-        //           Text(getOrderStatus(listData[index].status),
+        //           Text(getOrderStatus(order.status),
         //               style:
         //                   const TextStyle(fontSize: 14, color: Color(0xfffa436a)))
         //         ],

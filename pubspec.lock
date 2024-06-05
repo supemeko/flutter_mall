@@ -25,6 +25,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.11.0"
+  bitmask:
+    dependency: "direct main"
+    description:
+      name: bitmask
+      sha256: c3b05da74dc115f649266047cf3ad6b5f0df739c2b9702a282b5091dbedda708
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "1.0.1"
   boolean_selector:
     dependency: transitive
     description:
