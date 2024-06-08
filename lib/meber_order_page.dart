@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mall/config/service_url.dart';
 import 'package:flutter_mall/utils/http_util.dart';
 import 'package:flutter_mall/widgets/cached_image_widget.dart';
@@ -21,14 +22,14 @@ const int _statusInvalid = 32;
 enum _PageTabs {
   all(
       title: "全部",
-      mask: _statusWaitPay &
-          _statusWaitSend &
-          _statusSend &
-          _statusFinish &
-          _statusClose &
+      mask: _statusWaitPay |
+          _statusWaitSend |
+          _statusSend |
+          _statusFinish |
+          _statusClose |
           _statusInvalid),
   waitPay(title: "待支付", mask: _statusWaitSend),
-  waitReceiving(title: "待收货/使用", mask: _statusWaitSend & _statusSend),
+  waitReceiving(title: "待收货/使用", mask: _statusWaitSend | _statusSend),
   finish(title: "已完成", mask: _statusFinish),
   cancel(title: "已取消", mask: _statusClose);
 
@@ -154,10 +155,10 @@ class _MemberOrderPageWidgetState extends State<MemberOrderPageWidget>
     });
   }
 
-  void _onPageChanged(int currentPageIndex) {
+  void _onPageChanged(int currentPageIndex) async {
+    await _queryTabData(_PageTabs.values[currentPageIndex]);
     setState(() {
       _tabController.index = currentPageIndex;
-      _queryTabData(_PageTabs.values[currentPageIndex]);
       _currentPageIndex = currentPageIndex;
     });
   }
@@ -188,23 +189,23 @@ class _TabWidget extends StatelessWidget {
       child: Column(
         children: [
           Expanded(
-            child: Expanded(
-              child: ListView.builder(
-                itemCount: data.length,
-                itemBuilder: buildCard,
+            child: ListView.builder(
+              itemCount: data.length,
+              itemBuilder: (context, index) => _OrderCard(
+                orderData: data[index],
+                callback: (name, params) {
+                  print("[$name]:开始事件");
+                  print("[$name]:$params");
+                },
               ),
             ),
           ),
-          const Text("没有商品哦"),
-          const SizedBox(height: 50),
-          buildPersonalizedProductRecommendations()
+          if (data.isEmpty) const Text("没有商品哦"),
+          if (data.isEmpty) const SizedBox(height: 50),
+          if (data.isEmpty) buildPersonalizedProductRecommendations()
         ],
       ),
     );
-  }
-
-  Widget buildCard(BuildContext context, int orderIndex) {
-    return _OrderCard(orderData: data[orderIndex]);
   }
 
   // 构建订单操作
@@ -414,8 +415,99 @@ class _TabWidget extends StatelessWidget {
   }
 }
 
+class _ClickableTooltipWidget extends StatefulWidget {
+  final List<_OrderCardAction> actions;
+
+  const _ClickableTooltipWidget(this.actions, {super.key});
+
+  @override
+  State<StatefulWidget> createState() => _ClickableTooltipWidgetState();
+}
+
+class _ClickableTooltipWidgetState extends State<_ClickableTooltipWidget> {
+  late List<_OrderCardAction> actions;
+  final OverlayPortalController _tooltipController = OverlayPortalController();
+
+  @override
+  void initState() {
+    super.initState();
+    actions = widget.actions;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final link = LayerLink();
+    return TextButton(
+      onPressed: () async {
+        print("onPressed");
+        _tooltipController.toggle();
+      },
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.all(0),
+        visualDensity: VisualDensity.compact,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.zero,
+        ),
+      ),
+      child: OverlayPortal(
+        controller: _tooltipController,
+        overlayChildBuilder: (BuildContext context) {
+          return Positioned(
+            width: 100,
+            child: CompositedTransformFollower(
+              targetAnchor: Alignment.topRight,
+              followerAnchor: Alignment.bottomLeft,
+              offset: const Offset(-10, 0),
+              link: link,
+              child: Container(
+                color: Colors.white,
+                child: TapRegion(
+                  consumeOutsideTaps: true,
+                  onTapOutside: (event) async {
+                    print("onTapOutside");
+                    _tooltipController.hide();
+                  },
+                  child: Column(
+                    children: actions.map(
+                      (action) {
+                        return SizedBox(
+                          width: 100,
+                          child: TextButton(
+                            onPressed: () async {
+                              await action.doAction();
+                              _tooltipController.hide();
+                            },
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.all(0),
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.zero,
+                              ),
+                            ),
+                            child: Text(action.actionType.title),
+                          ),
+                        );
+                      },
+                    ).toList(),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        child: CompositedTransformTarget(
+            link: link,
+            child: const Text('更多', style: TextStyle(fontSize: 14))),
+      ),
+    );
+  }
+}
+
 (bool, dynamic) defaultMatch(OrderData orderData) {
   return (true, null);
+}
+
+(bool, dynamic) defaultMatch2(OrderData orderData) {
+  return (orderData.id != 12, null);
 }
 
 (bool, dynamic) afterSalesMatch(OrderData orderData) {
@@ -433,8 +525,8 @@ enum _OrderCardActionType {
   afterSales("退换/售后", afterSalesMatch),
   sell("卖了换钱", sellMatch),
   invoice("查看发票", defaultMatch),
-  evaluate("评价晒单", defaultMatch),
-  delete("删除", defaultMatch),
+  evaluate("评价晒单", defaultMatch2),
+  delete("删除", defaultMatch2),
   ;
 
   final String title;
@@ -442,43 +534,48 @@ enum _OrderCardActionType {
 
   const _OrderCardActionType(this.title, this.condition);
 
-  (bool, _OrderCardAction) match(OrderData orderData) {
+  (bool, _OrderCardAction) generateAction(
+      OrderData orderData, Function(String name, dynamic params) callback) {
     var (cond, dync) = condition(orderData);
-    return (cond, _OrderCardAction(this, dync));
+    return (
+      cond,
+      _OrderCardAction(
+          actionType: this,
+          doAction: () {
+            callback(title, dync);
+          })
+    );
   }
 }
 
 class _OrderCardAction {
   final _OrderCardActionType actionType;
-  final dynamic params;
+  final Function() doAction;
 
-  const _OrderCardAction(this.actionType, this.params);
+  const _OrderCardAction({required this.actionType, required this.doAction});
 }
 
 class _OrderCard extends StatelessWidget {
-  OrderData orderData;
+  final OrderData orderData;
+  final Function(String name, dynamic params) callback;
 
-  _OrderCard({super.key, required this.orderData});
-
-  List<_OrderCardAction> matchActions() {
-    List<_OrderCardAction> actions = [];
-    for (var actionType in _OrderCardActionType.values) {
-      var (result, params) = actionType.match(orderData);
-      if (result) {
-        actions.add(params);
-      }
-    }
-    return actions;
-  }
+  const _OrderCard(
+      {super.key, required this.orderData, required this.callback});
 
   @override
   Widget build(BuildContext context) {
     final itemList = orderData.orderItemList;
-    final actions = matchActions();
+    final actions = _OrderCardActionType.values
+        .map((e) => e.generateAction(orderData, callback))
+        .where((value) => value.$1)
+        .map((e) => e.$2)
+        .toList();
 
     assert(itemList.isNotEmpty,
         'The order should have included at least one item, but order(${orderData.id}) did not');
 
+    bool needMoreAction = actions.length > 4;
+    int displayActionCount = needMoreAction ? 3 : min(actions.length, 4);
     return Card(
         margin: const EdgeInsets.all(10),
         child: Container(
@@ -525,26 +622,30 @@ class _OrderCard extends StatelessWidget {
               ListTile(
                 title: Row(
                   children: [
-                    if (actions.length > 3) ...[
-                      const Text("更多",
-                          style: TextStyle(
-                              fontSize: 12, color: Color(0xffaaacb0))),
-                      const Expanded(child: Text(""))
+                    if (needMoreAction) ...[
+                      SizedBox(
+                        width: 30,
+                        height: 48,
+                        child: _ClickableTooltipWidget(
+                            actions.skip(displayActionCount).toList()),
+                      )
                     ],
+                    const Expanded(child: Text("")),
                     ...actions
-                        .map((e) {
+                        .take(displayActionCount)
+                        .map((action) {
                           return <Widget>[
                             TextButton(
                               onPressed: () {},
                               style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
                                   shape: const RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.all(Radius.circular(20)),
-                                side: BorderSide(
-                                    color: Color(0xffaaacb0), width: 1),
-                              )),
-                              child: const Text("买了换钱",
-                                  style: TextStyle(
+                                      borderRadius:
+                                          BorderRadius.all(Radius.circular(20)),
+                                      side: BorderSide(
+                                          color: Color(0xffaaacb0), width: 1))),
+                              child: Text(action.actionType.title,
+                                  style: const TextStyle(
                                       fontSize: 14, color: Color(0xff303133))),
                             ),
                             const SizedBox(width: 5)
@@ -588,12 +689,14 @@ class _OrderCard extends StatelessWidget {
       ),
       const SizedBox(width: 1),
       Expanded(
-          child: ListTile(
-              title: Text(
-        firstItemDesc,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      )))
+        child: ListTile(
+          title: Text(
+            firstItemDesc,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      )
     ];
   }
 
@@ -607,28 +710,29 @@ class _OrderCard extends StatelessWidget {
 
     return [
       Expanded(
-          child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                  children: pictureIterator
-                      .map((elem) => Row(
-                            children: [
-                              CachedImageWidget(
-                                96,
-                                96,
-                                elem,
-                                fit: BoxFit.contain,
-                              ),
-                              const SizedBox(width: 8)
-                            ],
-                          ))
-                      .toList())))
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: pictureIterator
+                .map((elem) => Row(children: [
+                      CachedImageWidget(
+                        96,
+                        96,
+                        elem,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(width: 8)
+                    ]))
+                .toList(),
+          ),
+        ),
+      )
     ];
   }
 }
 
 mixin _PageData {
-  List<List<OrderData>?> list = _PageTabs.values.map((e) => null).toList();
+  List<List<OrderData>?> list = [..._PageTabs.values.map((e) => null)];
 
   Future<void> _queryTabData(_PageTabs tab) async {
     const page = 1;

@@ -7,6 +7,7 @@ import 'package:flutter_mall/config/service_url.dart';
 import 'package:flutter_mall/utils/http_util.dart';
 import 'package:flutter_mall/widgets/cached_image_widget.dart';
 import 'dart:developer' as developer;
+import 'meber_order_page.dart';
 import 'model/order_list_model.dart';
 
 ///
@@ -63,54 +64,59 @@ class _OrderListState extends State<OrderList> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: MemberOrderPageTabs.values.length,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text(' 我的订单 '),
-          titleTextStyle: const TextStyle(fontSize: 16, color: Colors.black),
-          centerTitle: true,
-          bottom: PreferredSize(
-            preferredSize: const Size(double.infinity, 50.0),
-            child: PageIndicator(
-                tabController: _tabController,
-                currentPageIndex: _currentPageIndex,
-                onUpdateCurrentPageIndex: (index) {
-                  setState(() {
-                    _currentPageIndex = index;
-                    _pageViewController.animateToPage(_currentPageIndex,
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut);
-                  });
-                }),
-          ),
-        ),
-        body: Column(
-          children: [
-            const SizedBox(height: 10.0),
-            Expanded(
-              child: PageView(
-                controller: _pageViewController,
-                onPageChanged: _handlePageViewChanged,
-                children: MemberOrderPageTabs.values.map((tab) {
-                  return OrderListInfo(
-                    enumerate: tab,
-                    onQueryList: (page) async {
-                      _queryOrderListData(tab, page);
-                    },
-                    onOrderCancel: (orderId) {
-                      return cancelOrder(orderId);
-                    },
-                    listData: orderListData[tab.index],
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return MemberOrderPageWidget();
   }
+
+  // @override
+  // Widget build(BuildContext context) {
+  //   return DefaultTabController(
+  //     length: MemberOrderPageTabs.values.length,
+  //     child: Scaffold(
+  //       appBar: AppBar(
+  //         title: const Text(' 我的订单 '),
+  //         titleTextStyle: const TextStyle(fontSize: 16, color: Colors.black),
+  //         centerTitle: true,
+  //         bottom: PreferredSize(
+  //           preferredSize: const Size(double.infinity, 50.0),
+  //           child: PageIndicator(
+  //               tabController: _tabController,
+  //               currentPageIndex: _currentPageIndex,
+  //               onUpdateCurrentPageIndex: (index) {
+  //                 setState(() {
+  //                   _currentPageIndex = index;
+  //                   _pageViewController.animateToPage(_currentPageIndex,
+  //                       duration: const Duration(milliseconds: 300),
+  //                       curve: Curves.easeInOut);
+  //                 });
+  //               }),
+  //         ),
+  //       ),
+  //       body: Column(
+  //         children: [
+  //           const SizedBox(height: 10.0),
+  //           Expanded(
+  //             child: PageView(
+  //               controller: _pageViewController,
+  //               onPageChanged: _handlePageViewChanged,
+  //               children: MemberOrderPageTabs.values.map((tab) {
+  //                 return OrderListInfo(
+  //                   enumerate: tab,
+  //                   onQueryList: (page) async {
+  //                     _queryOrderListData(tab, page);
+  //                   },
+  //                   onOrderCancel: (orderId) {
+  //                     return cancelOrder(orderId);
+  //                   },
+  //                   listData: orderListData[tab.index],
+  //                 );
+  //               }).toList(),
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   void _handlePageViewChanged(int currentPageIndex) {
     _tabController.index = currentPageIndex;
