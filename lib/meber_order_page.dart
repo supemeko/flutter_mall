@@ -190,7 +190,7 @@ class _TabWidget extends StatelessWidget {
               itemCount: data.length,
               itemBuilder: (context, index) => _OrderCard(
                 orderData: data[index],
-                callback: (name, params) async {
+                orderEvent: (name, params) async {
                   await handleEvent(data[index], name, params);
                 },
               ),
@@ -333,14 +333,14 @@ enum _OrderCardActionType {
   const _OrderCardActionType(this.title, this.condition);
 
   (bool, _OrderCardAction) generateAction(
-      OrderData orderData, Function(String name, dynamic params) callback) {
+      OrderData orderData, Function(String name, dynamic params) doAction) {
     var (cond, dync) = condition(orderData);
     return (
       cond,
       _OrderCardAction(
           actionType: this,
           doAction: () {
-            callback(title, dync);
+            doAction(title, dync);
           })
     );
   }
@@ -355,16 +355,16 @@ class _OrderCardAction {
 
 class _OrderCard extends StatelessWidget {
   final OrderData orderData;
-  final Function(String name, dynamic params) callback;
+  final Function(String name, dynamic params) orderEvent;
 
   const _OrderCard(
-      {super.key, required this.orderData, required this.callback});
+      {super.key, required this.orderData, required this.orderEvent});
 
   @override
   Widget build(BuildContext context) {
     final itemList = orderData.orderItemList;
     final actions = _OrderCardActionType.values
-        .map((e) => e.generateAction(orderData, callback))
+        .map((e) => e.generateAction(orderData, orderEvent))
         .where((value) => value.$1)
         .map((e) => e.$2)
         .toList();
