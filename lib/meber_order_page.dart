@@ -68,7 +68,10 @@ enum _OrderStatus {
   }
 
   static _OrderStatus of(OrderData data) {
-    return _OrderStatus.values[data.orderType];
+    if (data.status >= _OrderStatus.values.length) {
+      return _OrderStatus.invalid;
+    }
+    return _OrderStatus.values[data.status];
   }
 }
 
@@ -407,7 +410,7 @@ class _OrderCard extends StatelessWidget {
                           style: const TextStyle(
                               fontSize: 14, color: Color(0xff303133))),
                     ),
-                    Text(_OrderStatus.values[orderData.status].title,
+                    Text(_OrderStatus.of(orderData).title,
                         style: const TextStyle(
                             fontSize: 14, color: Color(0xfffa436a)))
                   ],
@@ -446,7 +449,8 @@ class _OrderCard extends StatelessWidget {
                       )
                     ],
                     const Expanded(child: Text("")),
-                    ...List.generate(displayActionCount, (index) => displayActionCount - 1 - index)
+                    ...List.generate(displayActionCount,
+                            (index) => displayActionCount - 1 - index)
                         .where((element) => element < actions.length)
                         .map((element) => actions[element])
                         .map((action) {
