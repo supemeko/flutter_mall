@@ -27,7 +27,7 @@ const _tabWaitReceivingStatus = _statusWaitSend | _statusSend;
 
 enum _PageTabs {
   all(title: "全部", mask: _tabAllStatuses),
-  waitPay(title: "待支付", mask: _statusWaitSend),
+  waitPay(title: "待支付", mask: _statusWaitPay),
   waitReceiving(title: "待收货/使用", mask: _tabWaitReceivingStatus),
   finish(title: "已完成", mask: _statusFinish),
   cancel(title: "已取消", mask: _statusClose);
@@ -62,6 +62,43 @@ enum _OrderStatus {
   final String title;
 
   const _OrderStatus({required this.title});
+
+  bool match(int orderType) {
+    return index == orderType;
+  }
+
+  static _OrderStatus of(OrderData data) {
+    return _OrderStatus.values[data.orderType];
+  }
+}
+
+enum _OrderCardActionType {
+  buyAgain("再次购买", defaultMatch),
+  afterSales("退换/售后", afterSalesMatch),
+  sell("卖了换钱", sellMatch),
+  invoice("查看发票", defaultMatch),
+  evaluate("评价晒单", defaultMatch2),
+  delete("删除", deleteMatch),
+  cancel("取消", cancelMatch),
+  ;
+
+  final String title;
+  final (bool, dynamic) Function(OrderData orderData) condition;
+
+  const _OrderCardActionType(this.title, this.condition);
+
+  (bool, _OrderCardAction) generateAction(
+      OrderData orderData, Function(String name, dynamic params) doAction) {
+    var (cond, dync) = condition(orderData);
+    return (
+      cond,
+      _OrderCardAction(
+          actionType: this,
+          doAction: () {
+            doAction(title, dync);
+          })
+    );
+  }
 }
 
 /// 订单页组件
@@ -304,6 +341,14 @@ class _MoreButtonWidgetState extends State<_MoreButtonWidget> {
   return (true, null);
 }
 
+(bool, dynamic) cancelMatch(OrderData orderData) {
+  return (_OrderStatus.waitPay.match(orderData.status), null);
+}
+
+(bool, dynamic) deleteMatch(OrderData orderData) {
+  return (_OrderStatus.close.match(orderData.status), null);
+}
+
 (bool, dynamic) defaultMatch2(OrderData orderData) {
   return (orderData.id != 12, null);
 }
@@ -316,34 +361,6 @@ class _MoreButtonWidgetState extends State<_MoreButtonWidget> {
 (bool, dynamic) sellMatch(OrderData orderData) {
   var orderItemList = orderData.orderItemList;
   return (orderItemList[0].realAmount > 1000, null);
-}
-
-enum _OrderCardActionType {
-  buyAgain("再次购买", defaultMatch),
-  afterSales("退换/售后", afterSalesMatch),
-  sell("卖了换钱", sellMatch),
-  invoice("查看发票", defaultMatch),
-  evaluate("评价晒单", defaultMatch2),
-  delete("删除", defaultMatch2),
-  ;
-
-  final String title;
-  final (bool, dynamic) Function(OrderData orderData) condition;
-
-  const _OrderCardActionType(this.title, this.condition);
-
-  (bool, _OrderCardAction) generateAction(
-      OrderData orderData, Function(String name, dynamic params) doAction) {
-    var (cond, dync) = condition(orderData);
-    return (
-      cond,
-      _OrderCardAction(
-          actionType: this,
-          doAction: () {
-            doAction(title, dync);
-          })
-    );
-  }
 }
 
 class _OrderCardAction {
@@ -429,8 +446,9 @@ class _OrderCard extends StatelessWidget {
                       )
                     ],
                     const Expanded(child: Text("")),
-                    ...actions
-                        .take(displayActionCount)
+                    ...List.generate(displayActionCount, (index) => displayActionCount - 1 - index)
+                        .where((element) => element < actions.length)
+                        .map((element) => actions[element])
                         .map((action) {
                           return <Widget>[
                             TextButton(
@@ -549,7 +567,7 @@ mixin _PageData {
   Future<void> _handleEvent(
       OrderData orderData, String name, dynamic value) async {
     switch (name) {
-      case "cancel":
+      case "取消":
         _cancelOrder(orderData.id);
         return;
     }
