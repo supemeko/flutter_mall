@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_mall/config/service_url.dart';
 import 'package:flutter_mall/utils/http_util.dart';
 import 'package:flutter_mall/widgets/cached_image_widget.dart';
@@ -18,18 +17,18 @@ const int _statusSend = 4;
 const int _statusFinish = 8;
 const int _statusClose = 16;
 const int _statusInvalid = 32;
+const int _tabAllStatuses = _statusWaitPay |
+    _statusWaitSend |
+    _statusSend |
+    _statusFinish |
+    _statusClose |
+    _statusInvalid;
+const _tabWaitReceivingStatus = _statusWaitSend | _statusSend;
 
 enum _PageTabs {
-  all(
-      title: "全部",
-      mask: _statusWaitPay |
-          _statusWaitSend |
-          _statusSend |
-          _statusFinish |
-          _statusClose |
-          _statusInvalid),
+  all(title: "全部", mask: _tabAllStatuses),
   waitPay(title: "待支付", mask: _statusWaitSend),
-  waitReceiving(title: "待收货/使用", mask: _statusWaitSend | _statusSend),
+  waitReceiving(title: "待收货/使用", mask: _tabWaitReceivingStatus),
   finish(title: "已完成", mask: _statusFinish),
   cancel(title: "已取消", mask: _statusClose);
 
@@ -133,9 +132,7 @@ class _MemberOrderPageWidgetState extends State<MemberOrderPageWidget>
                       await _queryTabData(tab);
                       setState(() {});
                     },
-                    cancelOrder: (orderId) {
-                      return _cancelOrder(orderId);
-                    },
+                    handleEvent: _handleEvent,
                     data: tabData,
                   );
                 }).toList(),
@@ -168,15 +165,15 @@ class _TabWidget extends StatelessWidget {
   final _PageTabs tab;
   final List<OrderData> data;
   final Function(int page) queryList;
-  final Function(int orderId) cancelOrder;
+  final Function(OrderData orderData, String name, dynamic params) handleEvent;
   final int page = 1;
 
   const _TabWidget({
     super.key,
     required this.tab,
     required this.queryList,
-    required this.cancelOrder,
     required this.data,
+    required this.handleEvent,
   });
 
   @override
@@ -193,9 +190,8 @@ class _TabWidget extends StatelessWidget {
               itemCount: data.length,
               itemBuilder: (context, index) => _OrderCard(
                 orderData: data[index],
-                callback: (name, params) {
-                  print("[$name]:开始事件");
-                  print("[$name]:$params");
+                callback: (name, params) async {
+                  await handleEvent(data[index], name, params);
                 },
               ),
             ),
@@ -206,202 +202,6 @@ class _TabWidget extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  // 构建订单操作
-  Container buildOrderOperate(int index) {
-    int status = data[index].status;
-    int orderId = data[index].id;
-    return Container(
-      padding: const EdgeInsets.only(right: 5),
-      height: 40,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Visibility(
-            visible: status == 0,
-            child: TextButton(
-              onPressed: () async {
-                await cancelOrder(orderId);
-              },
-              // style: ButtonStyle(backgroundColor: MaterialStateProperty.all(Colors.white12)),
-              child: const Text("取消订单",
-                  style: TextStyle(fontSize: 14, color: Color(0xff303133))),
-            ),
-          ),
-          Visibility(
-              visible: status == 2,
-              child: TextButton(
-                onPressed: () {},
-                // style: ButtonStyle(backgroundColor: MaterialStateProperty.all(Colors.white12)),
-                child: const Text("查看物流",
-                    style: TextStyle(fontSize: 14, color: Color(0xff303133))),
-              )),
-          Visibility(
-              visible: status == 0,
-              child: TextButton(
-                onPressed: () {},
-                // style: ButtonStyle(backgroundColor: MaterialStateProperty.all(Colors.white12)),
-                child: const Text("立即付款",
-                    style: TextStyle(fontSize: 14, color: Color(0xfffa436a))),
-              )),
-          // const SizedBox(
-          //   width: 5,
-          // ),
-          Visibility(
-              visible: status == 2,
-              child: TextButton(
-                onPressed: () {},
-                // style: ButtonStyle(backgroundColor: MaterialStateProperty.all(Color(0xfff7bcc8))),
-                child: const Text("确认收货",
-                    style: TextStyle(fontSize: 14, color: Color(0xfffa436a))),
-              )),
-          Visibility(
-              visible: status == 3,
-              child: TextButton(
-                onPressed: () {},
-                // style: ButtonStyle(backgroundColor: MaterialStateProperty.all(Color(0xfff7bcc8))),
-                child: const Text("评价商品",
-                    style: TextStyle(fontSize: 14, color: Color(0xfffa436a))),
-              )),
-        ],
-      ),
-    );
-  }
-
-  // 构建订单支付金额
-  Container buildAmount(BoxDecoration boxDecoration, int index) {
-    return Container(
-      padding: const EdgeInsets.only(right: 15),
-      height: 40,
-      decoration: boxDecoration,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          const Text("共",
-              style: TextStyle(fontSize: 13, color: Color(0xff707070))),
-          Text(data[index].orderItemList.length.toString(),
-              style: const TextStyle(fontSize: 13, color: Color(0xff303133))),
-          const Text("件商品 实付款",
-              style: TextStyle(fontSize: 13, color: Color(0xff707070))),
-          const Text(" ￥",
-              style: TextStyle(fontSize: 12, color: Color(0xff707070))),
-          Text(data[index].payAmount.toString(),
-              style: const TextStyle(fontSize: 16, color: Color(0xff303133))),
-        ],
-      ),
-    );
-  }
-
-  // 构建商品列表
-  Column buildProductList(int index) {
-    return Column(
-      children: data[index].orderItemList.map((item) {
-        return Container(
-          padding: const EdgeInsets.only(right: 15, top: 15),
-          // decoration: boxDecoration,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              CachedImageWidget(
-                60,
-                60,
-                item.productPic,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(
-                width: 10,
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item.productName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 15, color: Color(0xff303133))),
-                    const Text("颜色:黑色;容量:128G; x 1",
-                        style:
-                            TextStyle(fontSize: 13, color: Color(0xff707070))),
-                    Row(
-                      children: [
-                        const Text("￥",
-                            style: TextStyle(
-                                fontSize: 12, color: Color(0xff707070))),
-                        Text(item.productPrice.toString(),
-                            style: const TextStyle(
-                                fontSize: 15, color: Color(0xff303133))),
-                      ],
-                    )
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  // 构建订单生成时间和订单状态
-  Container buildCreateTime(BoxDecoration boxDecoration, int index) {
-    return Container(
-      padding: const EdgeInsets.only(right: 15),
-      height: 40,
-      decoration: boxDecoration,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Text(data[index].createTime.toString(),
-                style: const TextStyle(fontSize: 14, color: Color(0xff303133))),
-          ),
-          Text(getOrderStatus(data[index].status),
-              style: const TextStyle(fontSize: 14, color: Color(0xfffa436a))),
-          Visibility(
-              visible: getDeleteStatus(data[index].status),
-              child: Container(
-                margin: const EdgeInsets.only(left: 10),
-                child: Image.asset(
-                  "images/delete.png",
-                  height: 17,
-                  width: 16,
-                ),
-              ))
-        ],
-      ),
-    );
-  }
-
-  // 状态转换
-  String getOrderStatus(int status) {
-    //0->待付款；1->待发货；2->已发货；3->已完成；4->已关闭；5->无效订单',
-    Map statusMap = <int, String>{};
-    statusMap[0] = "等待付款";
-    statusMap[1] = "待发货";
-    statusMap[2] = "等待收货";
-    statusMap[3] = "交易完成";
-    statusMap[4] = "交易关闭";
-    statusMap[5] = "无效订单";
-
-    return statusMap[status];
-  }
-
-  // 是否显示删除图标
-  bool getDeleteStatus(int status) {
-    //0->待付款；1->待发货；2->已发货；3->已完成；4->已关闭；5->无效订单',
-    Map statusMap = <int, bool>{};
-    statusMap[0] = false;
-    statusMap[1] = false;
-    statusMap[2] = false;
-    statusMap[3] = true;
-    statusMap[4] = true;
-    statusMap[5] = true;
-
-    return statusMap[status];
   }
 
   Widget buildPersonalizedProductRecommendations() {
@@ -415,16 +215,16 @@ class _TabWidget extends StatelessWidget {
   }
 }
 
-class _ClickableTooltipWidget extends StatefulWidget {
+class _MoreButtonWidget extends StatefulWidget {
   final List<_OrderCardAction> actions;
 
-  const _ClickableTooltipWidget(this.actions, {super.key});
+  const _MoreButtonWidget(this.actions, {super.key});
 
   @override
-  State<StatefulWidget> createState() => _ClickableTooltipWidgetState();
+  State<StatefulWidget> createState() => _MoreButtonWidgetState();
 }
 
-class _ClickableTooltipWidgetState extends State<_ClickableTooltipWidget> {
+class _MoreButtonWidgetState extends State<_MoreButtonWidget> {
   late List<_OrderCardAction> actions;
   final OverlayPortalController _tooltipController = OverlayPortalController();
 
@@ -439,7 +239,6 @@ class _ClickableTooltipWidgetState extends State<_ClickableTooltipWidget> {
     final link = LayerLink();
     return TextButton(
       onPressed: () async {
-        print("onPressed");
         _tooltipController.toggle();
       },
       style: TextButton.styleFrom(
@@ -464,7 +263,6 @@ class _ClickableTooltipWidgetState extends State<_ClickableTooltipWidget> {
                 child: TapRegion(
                   consumeOutsideTaps: true,
                   onTapOutside: (event) async {
-                    print("onTapOutside");
                     _tooltipController.hide();
                   },
                   child: Column(
@@ -626,7 +424,7 @@ class _OrderCard extends StatelessWidget {
                       SizedBox(
                         width: 30,
                         height: 48,
-                        child: _ClickableTooltipWidget(
+                        child: _MoreButtonWidget(
                             actions.skip(displayActionCount).toList()),
                       )
                     ],
@@ -636,7 +434,9 @@ class _OrderCard extends StatelessWidget {
                         .map((action) {
                           return <Widget>[
                             TextButton(
-                              onPressed: () {},
+                              onPressed: () async {
+                                await action.doAction();
+                              },
                               style: TextButton.styleFrom(
                                   visualDensity: VisualDensity.compact,
                                   shape: const RoundedRectangleBorder(
@@ -650,9 +450,8 @@ class _OrderCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 5)
                           ];
-                          return const SizedBox(width: 5);
                         })
-                        .expand<Widget>((element) => element as List<Widget>)
+                        .expand<Widget>((element) => element)
                         .toList()
                   ],
                 ),
@@ -702,7 +501,7 @@ class _OrderCard extends StatelessWidget {
 
   List<Widget> middleLayout1() {
     var orderItemList = orderData.orderItemList;
-// 最多允许显示多少件商品图片（可以显示的图片数量是有限的，没必要显示太多）
+    // 最多允许显示多少件商品图片（可以显示的图片数量是有限的，没必要显示太多）
     const maximumNumberOfPicturesAtDisplay = 4;
     final pictureIterator = orderItemList
         .sublist(0, min(orderItemList.length, maximumNumberOfPicturesAtDisplay))
@@ -745,6 +544,16 @@ mixin _PageData {
   Future<void> _cancelOrder(int orderId) async {
     Response result = await HttpUtil.get("$orderCancelUrl/$orderId");
     developer.log('$result');
+  }
+
+  Future<void> _handleEvent(
+      OrderData orderData, String name, dynamic value) async {
+    switch (name) {
+      case "cancel":
+        _cancelOrder(orderData.id);
+        return;
+    }
+    developer.log("${orderData.id} $name $value");
   }
 
   List<OrderData>? _getTabData(_PageTabs tab) {
